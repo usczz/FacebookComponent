@@ -2,8 +2,10 @@
 
 import facebook
 import sys
+import os
 import dicttoxml
 from xml.dom import minidom
+import psycopg2
 
 FACEBOOK_APP_ID = "1509848215939740"
 FACEBOOK_APP_SECRET = "7dd9773ab33433574ac6423cc5d8ff63"
@@ -28,9 +30,10 @@ class SearchParser:
 		output.write(self.xml)
 		output.close()
 		self.xmldoc = minidom.parse(self.filename)
+		os.remove(self.filename)
 		self.data = self.xmldoc.getElementsByTagName('data')
 		self.pageList = []
-		for x in xrange(0,self.data[0].childNodes.length-1):
+		for x in xrange(0,self.data[0].childNodes.length):
 			self.pageList.append(self.data[0].childNodes[x])
 		self.counter = 0
 
@@ -61,15 +64,35 @@ class SearchParser:
 	def Print(self):
 		print self.xmldoc.toxml()
 
-class pageParser:
+class verifiedPageChecker:
+	filename = 'verifypage.xml'
 
-	filename = 'pageResult.xml'
-
-	def __init__(self):
-		self.__initKeywordList()
+	def __init__(self,response):
+		self.xml = dicttoxml.dicttoxml(response)
+		output = open(self.filename,'w')
+		output.write(self.xml)
+		output.close()
+		self.xmldoc = minidom.parse(self.filename)
+		os.remove(self.filename)
+		self.data = self.xmldoc.getElementsByTagName('is_verified')
+		self.verified = self.data[0].firstChild.data
 
 	def Print(self):
 		print self.xmldoc.toxml()
+
+	def is_verifiedPage(self):
+		if self.verified == 'true':
+			return True
+		else:
+			return False
+
+class correctPageChecker:
+	filename = 'correctpage.xml'
+	team = None
+	spanish = None
+
+	def __init__(self):
+		self.__initKeywordList()
 
 	def __initKeywordList(self):
 		self.keyword = []
@@ -85,21 +108,88 @@ class pageParser:
 		self.keyword.append('usl')
 		self.keyword.append('NASL')
 		self.keyword.append('nasl')
+		self.keyword.append('goal')
+		self.keyword.append('us')
+		self.keyword.append('US')
+
+	def Print(self):
+		print self.xmldoc.toxml()
 
 	def addKeyword(self,keyword):
+		self.__addKeyword(keyword)
+
+	def __addKeyword(self,keyword):
 		self.keyword.append(keyword)
 
+	def removeKeyword(self,keyword):
+		self.__removeKeyword(keyword)
+
+	def __removeKeyword(self,keyword):
+		index = self.keyword.index(keyword)
+		self.keyword.pop(index)
+
 	def __checkKeyword(self,str):
-		for x in xrange(0,len(self.keyword)-1):
+		for x in xrange(0,len(self.keyword)):
 			if str.find(self.keyword[x]) != -1:
 				return True
-        
-	def load(self,response):
+
+	def load(self,response,team,spanish):
+		if self.team != None:
+			self.__removeKeyword(self.team)
+		if self.spanish != None:
+			self.__removeKeyword(self.spanish)
+		self.team = team
+		self.spanish = spanish
 		self.xml = dicttoxml.dicttoxml(response)
 		output = open(self.filename,'w')
 		output.write(self.xml)
 		output.close()
 		self.xmldoc = minidom.parse(self.filename)
+		os.remove(self.filename)
+		self.__addKeyword(team)
+		self.__addKeyword(spanish)
+	
+	def is_correctPage(self):
+		des = self.xmldoc.getElementsByTagName('description')
+		about = self.xmldoc.getElementsByTagName('about')
+		info = self.xmldoc.getElementsByTagName('personal_info')
+		username = self.xmldoc.getElementsByTagName('username')
+		if len(about) != 0:
+			about_data = about[0].firstChild.data
+			#print about_data
+			if self.__checkKeyword(about_data):
+				return True
+		if len(des) != 0:
+			des_data = des[0].firstChild.data
+			#print des_data
+			if self.__checkKeyword(des_data):
+				return True
+		if len(info) != 0:
+			info_data = info[0].firstChild.data
+			#print info_data
+			if self.__checkKeyword(info_data):
+				return True
+		if len(username) != 0:
+			name = username[0].firstChild.data
+			#print name
+			if name.find('official') != -1 or name.find('OFFICIAL') != -1:
+				return True
+		return False
+
+
+
+class pageParser:
+
+	filename = 'pageResult.xml'
+
+	def __init__(self,response):
+		self.xml = dicttoxml.dicttoxml(response)
+		output = open(self.filename,'w')
+		output.write(self.xml)
+		output.close()
+		self.xmldoc = minidom.parse(self.filename)
+		os.remove(self.filename)
+
 
 	def __parseItem(self):
 		likes = self.xmldoc.getElementsByTagName('likes')
@@ -114,101 +204,138 @@ class pageParser:
 		self.__parseItem()
 		return {'id':self.id,'talking_about':self.talking_data,'likes':self.likes_data}
 
-	def verifyPage(self):
-		des = self.xmldoc.getElementsByTagName('description')
-		about = self.xmldoc.getElementsByTagName('about')
-		info = self.xmldoc.getElementsByTagName('personal_info')
-		username = self.xmldoc.getElementsByTagName('username')
-		if len(about) != 0:
-			about_data = about[0].firstChild.data
-			if self.__checkKeyword(about_data):
-				return True
-		if len(des) != 0:
-			des_data = des[0].firstChild.data
-			if self.__checkKeyword(des_data):
-				return True
-		if len(info) != 0:
-			info_data = info[0].firstChild.data
-			if self.__checkKeyword(info_data):
-				return True
-		if len(username) != 0:
-			name = username[0].firstChild.data
-			if name.find('official') != -1 or name.find('OFFICIAL') != -1:
-				return True
-		return False
 
-class postParser:
+class postsParser:
 
 	filename = 'postsResult.xml'
 
-	def __init__(self,response):
+
+	def __init__(self,response,graph):
 		self.xml =  dicttoxml.dicttoxml(response)
 		output = open(self.filename,'w')
 		output.write(self.xml)
 		output.close()
 		self.xmldoc = minidom.parse(self.filename)
+		#os.remove(self.filename)
+		self.graph = graph
 		#print self.xmldoc.toxml()
 	
+	def getNext(self):
+		nexts = self.xmldoc.getElementsByTagName('next')
+		link = nexts[0].firstChild.data
+		linkindex = link.find(link,"/v2.1/")
+		linkdata = link[linkindex+6:]
+		return linkdata
+
+
 	def __parse(self):
 		result = []
-		item = {}
 		root = self.xmldoc.getElementsByTagName('root')
 		#print root[0].childNodes.length
 		if root[0].childNodes.length < 2:
-			return result
+		 	return result
 		data = root[0].childNodes[1]
-		print data.childNodes.length
-		for x in xrange(0,data.childNodes.length-1):
-			item = self.__parseItem(data.childNodes[x])
-			print item
-			result.append(item)		
+		# print data.childNodes.length
+
+		for x in xrange(0,data.childNodes.length):
+		 	item = data.childNodes[x]
+		 	postids = item.getElementsByTagName('id')
+		 	if not postids.length:
+		 		return None
+		 	postid = postids[postids.length-1].firstChild.data
+		 	postAgent = postParser(self.graph,postid)
+		 	itemdata = postAgent.Parse()
+		 	#print item
+		 	result.append(itemdata)		
 		return result	
 
 	def Parse(self):
 		result = self.__parse()
 		return result
 
+class postParser(object):
+	"""docstring for postParser"""
+	filename = "postResult.xml"
 
-	def __parseItem(self,element):
+	def __init__(self,graph,postid):
+		self.graph = graph
+		self.id = postid
+
+	
+	def Parse(self):
+		#get message
 		result = {}
-		#result['comments'] = self.__parseComments(element)
-		result['likes'] = self.__parseLikes(element)
-		result['Message'] = self.__parseMessage(element)
+		result['Status'] = self.__parseMessage()
+		result['Likes'] = self.__parseLikes()
+		result['Comments'] = self.__parseComments()
 		return result
 
-	def __parseComments(self,element):
+	def __parseComments(self):
 		result = {}
 		messages = []
-		comments = element.getElementsByTagName('comments')
-		if not len(comments) or comments[0].childNodes.length == 1:
+		#get total count of comments
+		response = self.graph.get_object(self.id+"/comments?summary=1&filter=toplevel&limit=250")
+		xml = dicttoxml.dicttoxml(response)
+		output = open(self.filename,'w')
+		output.write(xml)
+		output.close()
+		try:
+			xmldoc = minidom.parse(self.filename)
+			os.remove(self.filename)
+			total_counts = xmldoc.getElementsByTagName('total_count')
+			if len(total_counts):
+				result['total_count'] = total_counts[0].firstChild.data
+			else:
+				result['total_count'] = None
+			#get up to 250 comments in a page
+			#print result['total_count']
+			#print xmldoc.toxml()
+			if result['total_count'] != None and result['total_count']:
+				message = xmldoc.getElementsByTagName('message')
+				for x in xrange(0,message.length):
+					if message[x].firstChild != None:
+						messages.append(message[x].firstChild.data)
+			result['messages'] = messages
+		except Exception, e:
+			print 'Error %s' % e
+			output = open("dict",'w')
+			output.write(str(response))
+			output.close()
+		finally:		
 			return result
-		itemlist = comments[0].childNodes[1].childNodes
-		result['count'] = itemlist.length
-		for x in xrange(0,result['count']-1):
-			message = itemlist[x].getElementsByTagName('message')
-			if message[0].firstChild == None:
-				messages.append(None)
-				continue
-			messages.append(message[0].firstChild.data)
-		result['messages'] = messages
-		return result
 
-	def __parseLikes(self,element):
-		likes = element.getElementsByTagName('likes')
-		if not len(likes) or likes[0].childNodes.length < 2:
+	def __parseLikes(self):
+		response = self.graph.get_object(self.id+"/likes?summary=1&filter=toplevel")
+		xml = dicttoxml.dicttoxml(response)
+		output = open(self.filename,'w')
+		output.write(xml)
+		output.close()
+		xmldoc = minidom.parse(self.filename)
+		os.remove(self.filename)
+		total_counts = xmldoc.getElementsByTagName('total_count')
+		if not len(total_counts) :
 			return 0
-		data = likes[0].childNodes[1]
-		itemlist = data.childNodes
-		return len(itemlist)
+		return total_counts[0].firstChild.data
 
-	def __parseMessage(self,element):
-		message = element.getElementsByTagName('message')
+	def __parseMessage(self):
+		response = self.graph.get_object(self.id)
+		xml = dicttoxml.dicttoxml(response)
+		output = open(self.filename,'w')
+		output.write(xml)
+		output.close()
+		xmldoc = minidom.parse(self.filename)
+		os.remove(self.filename)
+		message = xmldoc.getElementsByTagName('message')
 		if not len(message):
 			return None
-		return message[message.length - 1].firstChild.data
+		try:	
+			return message[message.length - 1].firstChild.data
+		except Exception,e:
+			print "Error %s " % e
+			return None
 
 def setEncode(code):
-	#set the default encoding to specific
+	#set the default encoding to spedcific
 	reload(sys)
 	sys.setdefaultencoding(code)
 
@@ -220,19 +347,25 @@ def printResult(name,pageInfo,postInfo):
 	output.write('likes:'+pageInfo['likes']+'\n')
 	if not len(postInfo):
 		output.close() 
-	for i in xrange(0,len(postInfo)-1):
+	for i in xrange(0,len(postInfo)):
 		output.write('\n')
-		if postInfo[i]['Message'] != None:
-			output.write('post#'+str(i)+':'+postInfo[i]['Message']+'\n')
-		if postInfo[i]['likes'] != None:
-			output.write('likes:'+str(postInfo[i]['likes'])+'\n')
-		output.write('Comments:\n')
-		if postInfo[i]['comments'] != None:			
-			output.write('Count:'+str(postInfo[i]['comments']['count'])+'\n')
-			for j in xrange(0,postInfo[i]['comments']['count']-1):
-				if postInfo[i]['comments']['messages'][j] != None:
-					output.write(postInfo[i]['comments']['messages'][j]+'\n')
+		if postInfo[i]['Status'] != None:
+			output.write('post#'+str(i)+':'+postInfo[i]['Status']+'\n')
+		if postInfo[i]['Likes'] != None:
+			output.write('likes:'+str(postInfo[i]['Likes'])+'\n')
+		try:
+			output.write('Comments:\n')
+			if postInfo[i]['Comments'] != None:			
+				output.write('Count:'+str(postInfo[i]['Comments']['total_count'])+'\n')
+				for j in xrange(0,len(postInfo[i]['Comments']['messages'])):
+					if postInfo[i]['Comments']['messages'][j] != None:
+						output.write(postInfo[i]['Comments']['messages'][j]+'\n')
+		except Exception, e:
+			print "Error %s" % e
+		finally:
 			output.write('\n')
+
+
 	output.close()
 
 def main():
@@ -242,30 +375,63 @@ def main():
 	myAuthorizer = Authorizer(FACEBOOK_APP_ID,FACEBOOK_APP_SECRET)
 	token = myAuthorizer.get_access_token()
 	graph = facebook.GraphAPI(token)
-	idnamelist = ['Nick Rimando']
-	for i in xrange(0,len(idnamelist)):
+	con = None
+	playerList = None
+	try:
+		con = psycopg2.connect(database = "mydb")
+		cur = con.cursor()
+		cur.execute("SELECT * FROM player")
+		playerList = cur.fetchall()
+	except psycopg2.DatabaseError, e:
+		print 'Error %s' % e
+		sys.exit(1)
+	finally:
+		if con:
+			con.close()
+
+	for i in xrange(0,len(playerList)):
 		print i
-		idname = idnamelist[i]
+		name = playerList[i][0]
+		team = playerList[i][1]
+		spanish = playerList[i][2]
 		idtype = "page"
-		response = graph.get_object("search?q="+idname+"&type="+idtype)
+		response = graph.get_object("search?q="+name+"&type="+idtype)
 		searchAgent = SearchParser(response)
-		pageAgent = pageParser()
-		pageInfo = {}
-		postInfo = {}
+
+		pageChecker = correctPageChecker()
+		correctId = None
+		flag = False
 		#get the correct page id
 		while not searchAgent.isEmpty():
 			page = searchAgent.pop()
 			if page['category'] == 'Athlete':
-				response = graph.get_object(page['id'])
-				pageAgent.load(response)
-				if pageAgent.verifyPage():
-					pageInfo = pageAgent.parse()
+				response = graph.get_object(page['id']+"?fields=is_verified")
+				verifyChecker = verifiedPageChecker(response)
+				if verifyChecker.is_verifiedPage():
+					correctId = page['id']
+					flag = True
 					break
-		#print pageInfo
+				else:
+					response = graph.get_object(page['id'])
+					pageChecker.load(response,team,spanish)
+					if pageChecker.is_correctPage():
+						correctId = page['id']
+						flag = True
+						break
+		if not flag:
+			print "Cann't find "+playerList[i][0]
+			continue
+		response = graph.get_object(correctId)
+		pageAgent = pageParser(response)
+		pageInfo = pageAgent.parse()
+		#print pageInfo	
 		response = graph.get_object(pageInfo['id']+"/posts")
-		postAgent = postParser(response)
+		postAgent = postsParser(response,graph)
 		postInfo = postAgent.Parse()
-		# printResult(idname,pageInfo,postInfo)
+		#print postInfo
+		printResult(name,pageInfo,postInfo)
+
+
 
 
 
