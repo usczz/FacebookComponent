@@ -238,6 +238,7 @@ class postsParser:
 		# print data.childNodes.length
 
 		for x in xrange(0,data.childNodes.length):
+			print x
 		 	item = data.childNodes[x]
 		 	postids = item.getElementsByTagName('id')
 		 	if not postids.length:
@@ -293,14 +294,18 @@ class postParser(object):
 			if result['total_count'] != None and result['total_count']:
 				message = xmldoc.getElementsByTagName('message')
 				for x in xrange(0,message.length):
+					#print x
 					if message[x].firstChild != None:
 						messages.append(message[x].firstChild.data)
 			result['messages'] = messages
 		except Exception, e:
-			print 'Error %s' % e
-			output = open("dict",'w')
-			output.write(str(response))
-			output.close()
+			#print 'Error %s' % e
+			#print response['summary']['total_count']
+			result['total_count'] = response['summary']['total_count']
+			data = response['data']
+			for x in xrange(0,len(data)):
+				messages.append(data[x]['message'])
+			result['messages'] = messages
 		finally:		
 			return result
 
@@ -324,14 +329,14 @@ class postParser(object):
 		output.write(xml)
 		output.close()
 		xmldoc = minidom.parse(self.filename)
-		os.remove(self.filename)
+		#os.remove(self.filename)
 		message = xmldoc.getElementsByTagName('message')
 		if not len(message):
 			return None
 		try:	
 			return message[message.length - 1].firstChild.data
 		except Exception,e:
-			print "Error %s " % e
+			print "Parse Message Error %s " % e
 			return None
 
 def setEncode(code):
@@ -361,7 +366,7 @@ def printResult(name,pageInfo,postInfo):
 					if postInfo[i]['Comments']['messages'][j] != None:
 						output.write(postInfo[i]['Comments']['messages'][j]+'\n')
 		except Exception, e:
-			print "Error %s" % e
+			print "Print Result Obafemi MartinsError %s" % e
 		finally:
 			output.write('\n')
 
@@ -389,7 +394,7 @@ def main():
 		if con:
 			con.close()
 
-	for i in xrange(0,len(playerList)):
+	for i in xrange(10,len(playerList)):
 		print i
 		name = playerList[i][0]
 		team = playerList[i][1]
@@ -430,6 +435,8 @@ def main():
 		postInfo = postAgent.Parse()
 		#print postInfo
 		printResult(name,pageInfo,postInfo)
+		if i == 10:
+			break
 
 
 
