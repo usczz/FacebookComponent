@@ -9,7 +9,6 @@ import psycopg2
 from datetime import datetime
 import calendar
 import string
-import requests
 
 FACEBOOK_APP_ID = "1509848215939740"
 FACEBOOK_APP_SECRET = "7dd9773ab33433574ac6423cc5d8ff63"
@@ -226,8 +225,8 @@ class postsParser:
 	
 	def getNext(self):
 		nexts = self.xmldoc.getElementsByTagName('next')
-		link = nexts[0].firstChild.data
 		try:
+			link = nexts[0].firstChild.data
 			untilIndex = string.find(link,"until")
 			#print untilIndex
 			linkIndex = string.find(link,"/v2.1/")
@@ -238,7 +237,7 @@ class postsParser:
 			raise e
 			linkData = None
 		finally:
-			return link
+			return linkData
 
 
 	def __parse(self):
@@ -252,7 +251,7 @@ class postsParser:
 			data = root[0].childNodes[1]
 
 			# print data.childNodes.length
-			for x in xrange(0,data.childNodes.length):
+			for x in xrange(240,data.childNodes.length):
 				print x
 		 		item = data.childNodes[x]
 		 		postids = item.getElementsByTagName('id')
@@ -263,10 +262,10 @@ class postsParser:
 		 		itemdata = postAgent.Parse()
 		 		#print item
 		 		result.append(itemdata)
-		 	link = self.getNext()
-		 	if link != None:
-		 		r = requests.get(link)
-		 		response = r.json()
+		 	nextLink = self.getNext()
+		 	print nextLink
+		 	if nextLink != None:
+		 		response = self.graph.get_object(nextLink)
 		 		self.xml =  dicttoxml.dicttoxml(response)
 				output = open(self.filename,'w')
 				output.write(self.xml)
