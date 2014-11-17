@@ -193,7 +193,7 @@ class pageParser:
 		output.write(self.xml)
 		output.close()
 		self.xmldoc = minidom.parse(self.filename)
-		os.remove(self.filename)
+		# os.remove(self.filename)
 
 
 	def __parseItem(self):
@@ -203,6 +203,10 @@ class pageParser:
 		self.likes_data = likes[0].firstChild.data
 		self.talking_data = talking[0].firstChild.data
 		self.id = identifier[0].firstChild.data
+		print self.id
+		if identifier.length > 1:
+			self.id = identifier[identifier.length-1].firstChild.data
+		print self.id
 
 
 	def parse(self):
@@ -242,14 +246,7 @@ class postsParser:
 			if untilData < self.stamp:
 				link = None
 		except Exception, e:
-			log = open("ErrorLog","a")
-			if not log :
-				log = open("ErrorLog","w")
-
-			frameinfo = inspect.getframeinfo(inspect.currentframe())
-			log.write(frameinfo.filename+"#"+frameinfo.lineno+"\n")
-			log.write(e+"\n")
-			log.close()
+			print "Error %s" % e
 			link = None
 		finally:
 			return link
@@ -263,7 +260,7 @@ class postsParser:
 		pageCount = 0
 		while flag:
 			root = self.xmldoc.getElementsByTagName('root')
-			#print root[0].childNodes.length
+			# print root[0].toxml()
 			if root[0].childNodes.length < 2:
 		 		return result
 			data = root[0].childNodes[1]
@@ -281,18 +278,19 @@ class postsParser:
 		 		#print item
 		 		posts.append(itemdata)
 		 		count = count+1
-		 	link = self.getNext()
-		 	if link != None:
-		 		r = requests.get(link)
-		 		response = r.json()
-		 		self.xml =  dicttoxml.dicttoxml(response)
-				output = open(self.filename,'w')
-				output.write(self.xml)
-				output.close()
-				self.xmldoc = minidom.parse(self.filename)
-				pageCount = pageCount+1
-			else:
-				flag = False
+		 # 	link = self.getNext()
+		 # 	if link != None:
+		 # 		r = requests.get(link)
+		 # 		response = r.json()
+		 # 		self.xml =  dicttoxml.dicttoxml(response)
+			# 	output = open(self.filename,'w')
+			# 	output.write(self.xml)
+			# 	output.close()
+			# 	self.xmldoc = minidom.parse(self.filename)
+			# 	pageCount = pageCount+1
+			# else:
+			# 	flag = False
+			flag = False
 		result['count'] = count
 		result['posts'] = posts
 		return result	
@@ -333,14 +331,7 @@ class postParser:
 			if untilData < self.stamp:
 				link = None
 		except Exception, e:
-			log = open("ErrorLog","a")
-			if not log :
-				log = open("ErrorLog","w")
-
-			frameinfo = inspect.getframeinfo(inspect.currentframe())
-			log.write(frameinfo.filename+"#"+frameinfo.lineno+"\n")
-			log.write(e+"\n")
-			log.close()
+			print "Error %s" % e
 			link = None
 		finally:
 			return link
@@ -349,7 +340,7 @@ class postParser:
 		result = {}
 		messages = []
 		#get total count of comments
-		response = self.graph.get_object(self.id+"/comments?summary=1&filter=toplevel&limit=250")
+		response = self.graph.get_object(self.id+"/comments?summary=1&filter=toplevel&limit=25")
 		xml = dicttoxml.dicttoxml(response)
 		output = open(self.filename,'w')
 		output.write(xml)
@@ -373,25 +364,19 @@ class postParser:
 						#print x
 						if message[x].firstChild != None:
 							messages.append(message[x].firstChild.data)
-				link = self.getNext()
-				if link !=None:
-					r = requests.get(link)
-		 			response = r.json()
-		 			self.xml =  dicttoxml.dicttoxml(response)
-					output = open(self.filename,'w')
-					output.write(self.xml)
-					output.close()
-				else:
-					flag = False
+				# link = self.getNext()
+				# if link !=None:
+				# 	r = requests.get(link)
+		 	# 		response = r.json()
+		 	# 		self.xml =  dicttoxml.dicttoxml(response)
+				# 	output = open(self.filename,'w')
+				# 	output.write(self.xml)
+				# 	output.close()
+				# else:
+				# 	flag = False
+				flag = False
 			except Exception,e:
-				log = open("ErrorLog","a")
-				if not log :
-					log = open("ErrorLog","w")
-
-				frameinfo = inspect.getframeinfo(inspect.currentframe())
-				log.write(frameinfo.filename+"#"+frameinfo.lineno+"\n")
-				log.write(e+"\n")
-				log.close()
+				print "Error %s" % e
 				#print response['summary']['total_count']
 				result['total_count'] = response['summary']['total_count']
 				data = response['data']
@@ -522,15 +507,25 @@ def main():
 		if not flag:
 			print "Cann't find "+playerList[i][0]
 			continue
+		#print correctId
 		response = graph.get_object(correctId)
 		pageAgent = pageParser(response)
 		pageInfo = pageAgent.parse()
-		#print pageInfo	
 		response = graph.get_object(pageInfo['id']+"/posts?limit=25")
 		postAgent = postsParser(response,graph)
 		postInfo = postAgent.Parse()
-		#print postInfo
-		#printResult(name,pageInfo,postInfo)
+		print postInfo
+		# #printResult(name,pageInfo,postInfo)
+		if i == 0:
+		  	break
+	try:
+		con = psycopg2.connect(database = "mydb")
+		cur = con.cursor()
+		cur.execute("")
+	except Exception, e:
+		raise e
+	finally:
+		pass
 
 if __name__ == "__main__":
 	main()

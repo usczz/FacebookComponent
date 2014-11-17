@@ -112,8 +112,8 @@ class correctPageChecker:
 		self.keyword.append('NASL')
 		self.keyword.append('nasl')
 		self.keyword.append('goal')
-		self.keyword.append('us')
-		self.keyword.append('US')
+		#self.keyword.append('us')
+		#self.keyword.append('US')
 
 	def Print(self):
 		print self.xmldoc.toxml()
@@ -251,7 +251,7 @@ class postsParser:
 			data = root[0].childNodes[1]
 
 			# print data.childNodes.length
-			for x in xrange(240,data.childNodes.length):
+			for x in xrange(0,data.childNodes.length):
 				print x
 		 		item = data.childNodes[x]
 		 		postids = item.getElementsByTagName('id')
@@ -262,17 +262,17 @@ class postsParser:
 		 		itemdata = postAgent.Parse()
 		 		#print item
 		 		result.append(itemdata)
-		 	nextLink = self.getNext()
-		 	print nextLink
-		 	if nextLink != None:
-		 		response = self.graph.get_object(nextLink)
-		 		self.xml =  dicttoxml.dicttoxml(response)
-				output = open(self.filename,'w')
-				output.write(self.xml)
-				output.close()
-				self.xmldoc = minidom.parse(self.filename)
-			else:
-				flag = False
+		 # 	nextLink = self.getNext()
+		 # 	print nextLink
+		 # 	if nextLink != None:
+		 # 		response = self.graph.get_object(nextLink)
+		 # 		self.xml =  dicttoxml.dicttoxml(response)
+			# 	output = open(self.filename,'w')
+			# 	output.write(self.xml)
+			# 	output.close()
+			# 	self.xmldoc = minidom.parse(self.filename)
+			# else:
+			# 	flag = False
 		return result	
 
 	def Parse(self):
@@ -423,7 +423,7 @@ def main():
 		print i
 		name = playerList[i][0]
 		team = playerList[i][1]
-		spanish = playerList[i][2]
+		# spanish = playerList[i][2]
 		idtype = "page"
 		response = graph.get_object("search?q="+name+"&type="+idtype)
 		searchAgent = SearchParser(response)
@@ -454,12 +454,12 @@ def main():
 		response = graph.get_object(correctId)
 		pageAgent = pageParser(response)
 		pageInfo = pageAgent.parse()
-		#print pageInfo	
-		response = graph.get_object(pageInfo['id']+"/posts?limit=250")
-		postAgent = postsParser(response,graph)
-		postInfo = postAgent.Parse()
+		print pageInfo	
+		# response = graph.get_object(pageInfo['id']+"/posts?limit=250")
+		# postAgent = postsParser(response,graph)
+		# postInfo = postAgent.Parse()
 		#print postInfo
-		printResult(name,pageInfo,postInfo)
+		# printResult(name,pageInfo,postInfo)
 		if i == 0:
 			break
 
